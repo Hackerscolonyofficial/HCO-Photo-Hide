@@ -52,32 +52,24 @@ def create_html():
     </head>
     <body>
         <h1>HCO Photo Hide by Azhar</h1>
-        <input type="file" id="photo" /><br/>
-        <input type="password" placeholder="Enter Password" id="password" /><br/>
-        <button onclick="generateCode()">Generate Code</button>
-        <p id="msg" style="color:#00ffff;font-weight:bold;"></p>
+        <p>Select an image to hide or reveal data</p>
+        
+        <form action="/upload" method="post" enctype="multipart/form-data">
+            <input type="file" name="image" accept="image/*" required>
+            <br>
+            <input type="text" name="secret" placeholder="Secret data to hide (optional)">
+            <br>
+            <button type="submit" name="action" value="hide">Hide Data in Image</button>
+            <button type="submit" name="action" value="reveal">Reveal Data from Image</button>
+        </form>
+        
+        <div id="result" style="margin-top: 30px;"></div>
+        
         <script>
-            function generateCode() {
-                let fileInput = document.getElementById('photo');
-                let password = document.getElementById('password').value;
-                if(fileInput.files.length==0) { alert("Select a photo!"); return; }
-                if(password=="") { alert("Enter a password!"); return; }
-                let reader = new FileReader();
-                reader.onload = function() {
-                    let data = reader.result.split(',')[1];
-                    fetch('/save', {
-                        method:'POST',
-                        headers:{'Content-Type':'application/json'},
-                        body: JSON.stringify({photo:data, password:password, name:fileInput.files[0].name})
-                    }).then(r=>r.text()).then(t=>{
-                        document.getElementById('msg').innerText = "Code: " + t;
-                        // Create a shareable link
-                        let shareLink = window.location.origin + '/view?code=' + encodeURIComponent(t);
-                        document.getElementById('msg').innerHTML += "<br><br>Share this link:<br><input type='text' value='" + shareLink + "' style='width: 80%; padding: 10px;' readonly>";
-                    });
-                }
-                reader.readAsDataURL(fileInput.files[0]);
-            }
+            document.querySelector('form').addEventListener('submit', function(e) {
+                const resultDiv = document.getElementById('result');
+                resultDiv.innerHTML = '<p>Processing your request...</p>';
+            });
         </script>
     </body>
     </html>
@@ -86,201 +78,207 @@ def create_html():
     with open(os.path.join(WORKDIR, "index.html"), "w") as f:
         f.write(html_content)
     
-    # Viewer page
-    viewer_content = """
+    # Success page
+    success_html = """
     <html>
     <head>
-        <title>View Hidden Photo</title>
+        <title>Success - HCO Photo Hide</title>
         <style>
             body { background-color: #0d0d0d; color: #00ff99; font-family: monospace; text-align: center; padding-top: 50px; }
-            h1 { color: #ff0000; font-size: 2.5em; margin-bottom: 20px; }
-            input, button { padding: 12px 20px; margin: 15px; border-radius: 8px; border: 2px solid #00ff99; font-size: 1em; background-color: #1a1a1a; color:#00ff99; outline:none; }
-            button { border:2px solid #ff0000; color:#ff0000; }
-            img { max-width: 90%; margin-top: 20px; border: 2px solid #00ff99; }
+            h1 { color: #00ff00; }
+            a { color: #ff9900; text-decoration: none; margin: 10px; display: inline-block; padding: 10px; border: 1px solid #ff9900; }
         </style>
     </head>
     <body>
-        <h1>View Hidden Photo</h1>
-        <input type="password" placeholder="Enter Password" id="password" /><br/>
-        <button onclick="viewPhoto()">View Photo</button>
-        <div id="result"></div>
-        <script>
-            function getQueryParam(name) {
-                const urlParams = new URLSearchParams(window.location.search);
-                return urlParams.get(name);
-            }
-            
-            function viewPhoto() {
-                let password = document.getElementById('password').value;
-                if(password=="") { alert("Enter a password!"); return; }
-                
-                let code = getQueryParam('code');
-                if(!code) {
-                    document.getElementById('result').innerHTML = "<p style='color:red'>No code provided!</p>";
-                    return;
-                }
-                
-                fetch('/decode?code=' + encodeURIComponent(code) + '&password=' + encodeURIComponent(password))
-                    .then(response => response.json())
-                    .then(data => {
-                        if(data.success) {
-                            document.getElementById('result').innerHTML = "<img src='data:image/jpeg;base64," + data.photo + "' alt='Hidden Photo' />";
-                        } else {
-                            document.getElementById('result').innerHTML = "<p style='color:red'>" + data.message + "</p>";
-                        }
-                    })
-                    .catch(error => {
-                        document.getElementById('result').innerHTML = "<p style='color:red'>Error: " + error + "</p>";
-                    });
-            }
-        </script>
+        <h1>Operation Successful!</h1>
+        <p>{{MESSAGE}}</p>
+        <a href="/">Back to Home</a>
+        <a href="/download/{{FILENAME}}">Download File</a>
     </body>
     </html>
     """
     
-    with open(os.path.join(WORKDIR, "viewer.html"), "w") as f:
-        f.write(viewer_content)
+    with open(os.path.join(WORKDIR, "success.html"), "w") as f:
+        f.write(success_html)
 
-# --- Step 5: HTTP server ---
-class MyHandler(SimpleHTTPRequestHandler):
+# --- Step 5: Custom HTTP Request Handler ---
+class HCORequestHandler(SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=WORKDIR, **kwargs)
     
     def do_GET(self):
-        if self.path.startswith('/view'):
-            self.path = '/viewer.html'
-        elif self.path.startswith('/decode'):
-            # Handle decoding request
-            from urllib.parse import urlparse, parse_qs
-            parsed_url = urlparse(self.path)
-            query_params = parse_qs(parsed_url.query)
+        if self.path.startswith('/download/'):
+            filename = self.path.split('/')[-1]
+            filepath = os.path.join(WORKDIR, filename)
             
-            code = query_params.get('code', [''])[0]
-            password = query_params.get('password', [''])[0]
-            
-            try:
-                # Decode the base64 string
-                decoded = base64.b64decode(code).decode('utf-8')
-                
-                # The last part should be the password
-                if decoded.endswith(password):
-                    # Extract the image data (everything except the password)
-                    photo_data = decoded[:-len(password)]
-                    
-                    self.send_response(200)
-                    self.send_header("Content-type", "application/json")
-                    self.end_headers()
-                    self.wfile.write(json.dumps({
-                        "success": True,
-                        "photo": photo_data
-                    }).encode())
-                else:
-                    self.send_response(200)
-                    self.send_header("Content-type", "application/json")
-                    self.end_headers()
-                    self.wfile.write(json.dumps({
-                        "success": False,
-                        "message": "Incorrect password!"
-                    }).encode())
-            except Exception as e:
+            if os.path.exists(filepath):
                 self.send_response(200)
-                self.send_header("Content-type", "application/json")
+                self.send_header('Content-type', 'application/octet-stream')
+                self.send_header('Content-Disposition', f'attachment; filename="{filename}"')
                 self.end_headers()
-                self.wfile.write(json.dumps({
-                    "success": False,
-                    "message": f"Error decoding: {str(e)}"
-                }).encode())
-            return
-            
-        return super().do_GET()
+                
+                with open(filepath, 'rb') as f:
+                    self.wfile.write(f.read())
+            else:
+                self.send_error(404, "File not found")
+        else:
+            super().do_GET()
     
     def do_POST(self):
-        if self.path == '/save':
+        if self.path == '/upload':
+            content_type = self.headers['Content-Type']
+            if not content_type.startswith('multipart/form-data'):
+                self.send_error(400, "Bad Request: expecting multipart/form-data")
+                return
+            
+            # Parse form data
             content_length = int(self.headers['Content-Length'])
             post_data = self.rfile.read(content_length)
-            data = json.loads(post_data)
             
-            # Combine photo data and password, then encode
-            combined = data['photo'] + data['password']
-            encrypted = base64.b64encode(combined.encode()).decode()
+            # Parse multipart form data (simplified)
+            parts = content_type.split("boundary=")
+            if len(parts) < 2:
+                self.send_error(400, "Bad Request: no boundary")
+                return
             
-            # Generate a simple filename
-            filename = f"hidden_{int(time.time())}.txt"
-            save_path = os.path.join(WORKDIR, filename)
+            boundary = parts[1].encode()
+            parts = post_data.split(boundary)
             
-            with open(save_path, "w") as f:
-                f.write(encrypted)
+            file_data = None
+            secret_data = ""
+            action = ""
             
-            self.send_response(200)
-            self.send_header("Content-type", "text/plain")
-            self.end_headers()
-            self.wfile.write(encrypted.encode())
-        else:
-            self.send_error(404)
+            for part in parts:
+                if b'name="image"' in part and b'filename="' in part:
+                    # Extract file data
+                    file_start = part.find(b'\r\n\r\n') + 4
+                    file_end = part.rfind(b'\r\n')
+                    file_data = part[file_start:file_end]
+                    
+                    # Extract filename
+                    filename_match = re.search(b'filename="([^"]+)"', part)
+                    if filename_match:
+                        filename = filename_match.group(1).decode()
+                
+                if b'name="secret"' in part:
+                    # Extract secret data
+                    data_start = part.find(b'\r\n\r\n') + 4
+                    data_end = part.rfind(b'\r\n')
+                    secret_data = part[data_start:data_end].decode()
+                
+                if b'name="action"' in part:
+                    # Extract action
+                    data_start = part.find(b'\r\n\r\n') + 4
+                    data_end = part.rfind(b'\r\n')
+                    action = part[data_start:data_end].decode()
+            
+            if not file_data:
+                self.send_error(400, "Bad Request: no file uploaded")
+                return
+            
+            # Process the request
+            if action == "hide":
+                # Hide data in image
+                output_filename = f"hidden_{filename}"
+                output_path = os.path.join(WORKDIR, output_filename)
+                
+                # Write the original file
+                with open(output_path, 'wb') as f:
+                    f.write(file_data)
+                
+                # Append the secret data to the end of the file (simplified steganography)
+                with open(output_path, 'ab') as f:
+                    if secret_data:
+                        f.write(b"\nHCO_STEGANOGRAPHY_START\n")
+                        f.write(base64.b64encode(secret_data.encode()))
+                        f.write(b"\nHCO_STEGANOGRAPHY_END\n")
+                
+                # Show success page
+                self.send_response(200)
+                self.send_header('Content-type', 'text/html')
+                self.end_headers()
+                
+                with open(os.path.join(WORKDIR, "success.html"), "r") as f:
+                    success_content = f.read()
+                
+                success_content = success_content.replace("{{MESSAGE}}", f"Data hidden in {output_filename}")
+                success_content = success_content.replace("{{FILENAME}}", output_filename)
+                self.wfile.write(success_content.encode())
+                
+            elif action == "reveal":
+                # Reveal data from image
+                temp_path = os.path.join(WORKDIR, f"temp_{filename}")
+                with open(temp_path, 'wb') as f:
+                    f.write(file_data)
+                
+                # Read the file to extract hidden data
+                with open(temp_path, 'rb') as f:
+                    content = f.read()
+                
+                # Look for the hidden data markers
+                start_marker = b"\nHCO_STEGANOGRAPHY_START\n"
+                end_marker = b"\nHCO_STEGANOGRAPHY_END\n"
+                
+                start_idx = content.find(start_marker)
+                end_idx = content.find(end_marker)
+                
+                if start_idx != -1 and end_idx != -1:
+                    # Extract and decode the hidden data
+                    encoded_data = content[start_idx + len(start_marker):end_idx]
+                    secret_data = base64.b64decode(encoded_data).decode()
+                    
+                    # Show success page with revealed data
+                    self.send_response(200)
+                    self.send_header('Content-type', 'text/html')
+                    self.end_headers()
+                    
+                    with open(os.path.join(WORKDIR, "success.html"), "r") as f:
+                        success_content = f.read()
+                    
+                    success_content = success_content.replace("{{MESSAGE}}", f"Hidden data revealed: {secret_data}")
+                    success_content = success_content.replace("{{FILENAME}}", "")  # No file to download
+                    self.wfile.write(success_content.encode())
+                else:
+                    self.send_error(400, "No hidden data found in this image")
+                
+                # Clean up temp file
+                os.remove(temp_path)
+            
+            else:
+                self.send_error(400, "Bad Request: invalid action")
 
+# --- Step 6: Start HTTP Server ---
 def start_server():
     os.chdir(WORKDIR)
-    server = HTTPServer(("127.0.0.1", PORT), MyHandler)
-    print(Fore.GREEN + f"[+] Server started on port {PORT}")
+    server = HTTPServer(('localhost', PORT), HCORequestHandler)
+    print(Fore.GREEN + f"Server started at http://localhost:{PORT}")
     server.serve_forever()
 
-# --- Step 6: Start Cloudflare Tunnel and open public URL ---
-def start_tunnel_and_open():
-    # Run tunnel in background
-    proc = subprocess.Popen(
-        ['cloudflared', 'tunnel', '--url', f'http://127.0.0.1:{PORT}'],
-        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
-    )
-
-    public_url = None
-    timeout = time.time() + 10  # 10 seconds timeout
-    
-    print(Fore.YELLOW + "[+] Starting Cloudflare tunnel...")
-    
-    while time.time() < timeout:
-        line = proc.stderr.readline()
-        if not line:
-            time.sleep(0.1)
-            continue
-            
-        match = re.search(r'https://[^\s]+\.trycloudflare\.com', line)
-        if match:
-            public_url = match.group(0)
-            break
-
-    if public_url:
-        print(Fore.GREEN + f"[✔] Public URL: {public_url}")
-        # Open browser automatically
-        subprocess.run([
-            'am', 'start', '-a', 'android.intent.action.VIEW',
-            '-d', public_url
-        ])
-        print(Fore.GREEN + "\nHCO Photo Hide is now live on any phone!")
-        
-        # Keep the tunnel process running
-        try:
-            proc.wait()
-        except KeyboardInterrupt:
-            proc.terminate()
-    else:
-        print(Fore.RED + "[!] Failed to get public URL from Cloudflare tunnel")
-        proc.terminate()
-
-# --- Main ---
-def main():
-    os.system("clear")
+# --- Main Execution ---
+if __name__ == "__main__":
+    # Show tool lock message
     tool_lock()
+    
+    # Open YouTube app
     open_youtube_app()
+    
+    # Wait for user to return
     wait_for_enter()
+    
+    # Create HTML pages
     create_html()
-
-    server_thread = threading.Thread(target=start_server, daemon=True)
+    
+    # Start server in a separate thread
+    server_thread = threading.Thread(target=start_server)
+    server_thread.daemon = True
     server_thread.start()
     
-    # Give the server a moment to start
-    time.sleep(1)
+    # Open browser to the local server
+    subprocess.run(['am', 'start', '-a', 'android.intent.action.VIEW', '-d', f'http://localhost:{PORT}'])
     
-    start_tunnel_and_open()
-
-if __name__ == "__main__":
-    main()
+    # Keep the main thread alive
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        print(Fore.RED + "\nServer stopped by user")
