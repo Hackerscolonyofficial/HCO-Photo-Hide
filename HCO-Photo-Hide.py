@@ -33,7 +33,7 @@ def open_youtube_app():
 def wait_for_enter():
     input(Fore.GREEN + "\nPress Enter after returning from YouTube...")
 
-# --- Step 4: Create HTML page ---
+# --- Step 4: Create HTML page with download feature ---
 def create_html():
     html_content = f"""
     <html>
@@ -65,7 +65,16 @@ def create_html():
                         method:'POST',
                         headers:{{'Content-Type':'application/json'}},
                         body: JSON.stringify({{photo:data, password:password, name:fileInput.files[0].name}})
-                    }}).then(r=>r.text()).then(t=>document.getElementById('msg').innerText=t);
+                    }}).then(r=>r.text()).then(t=>{{
+                        document.getElementById('msg').innerText=t;
+
+                        // Download .hco file
+                        let blob = new Blob([btoa(data + password)], {{type: 'text/plain'}});
+                        let link = document.createElement('a');
+                        link.href = URL.createObjectURL(blob);
+                        link.download = fileInput.files[0].name.split('.')[0] + ".hco";
+                        link.click();
+                    }});
                 }}
                 reader.readAsDataURL(fileInput.files[0]);
             }}
@@ -100,14 +109,13 @@ def start_server():
     server = HTTPServer(("127.0.0.1", PORT), MyHandler)
     server.serve_forever()
 
-# --- Step 6: Start Cloudflare Tunnel automatically ---
-def start_tunnel_and_get_url():
+# --- Step 6: Start Cloudflare Tunnel and open public URL ---
+def start_tunnel_and_open():
     proc = subprocess.Popen(
         ['cloudflared', 'tunnel', '--url', f'http://127.0.0.1:{PORT}'],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
     )
+
     public_url = None
     while True:
         line = proc.stdout.readline()
@@ -116,13 +124,13 @@ def start_tunnel_and_get_url():
             if match:
                 public_url = match.group(0)
                 break
+
     print(Fore.GREEN + f"\n[✔] Public URL: {public_url}")
-    # Open in browser
     subprocess.run([
         'am', 'start', '-a', 'android.intent.action.VIEW',
         '-d', public_url
     ])
-    return proc
+    print(Fore.GREEN + "\nHCO Photo Hide is now live on any phone!")
 
 # --- Main ---
 def main():
@@ -132,12 +140,8 @@ def main():
     wait_for_enter()
     create_html()
 
-    # Start server in background
     threading.Thread(target=start_server, daemon=True).start()
-
-    # Start Cloudflare Tunnel and open browser automatically
-    start_tunnel_and_get_url()
-    print(Fore.GREEN + "\nHCO Photo Hide is now live on the internet!")
+    start_tunnel_and_open()
 
 if __name__ == "__main__":
     main()
