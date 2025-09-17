@@ -5,13 +5,15 @@ from colorama import Fore, init
 from http.server import SimpleHTTPRequestHandler, HTTPServer
 import threading
 import base64
-import socket
 import json
 
 init(autoreset=True)
 
 PORT = 8000
 WORKDIR = "/data/data/com.termux/files/home/HCO-Photo-Hide"
+
+# Replace with your Cloudflare public URL
+PUBLIC_URL = "https://abcd1234.cloudflaretunnel.com"
 
 # --- Step 1: Tool Lock Message ---
 def tool_lock():
@@ -40,28 +42,18 @@ def create_html():
     <head>
         <title>HCO Photo Hide</title>
         <style>
-            @keyframes glitch {{
-                0% {{ text-shadow: 2px 0 red, -2px 0 cyan; }}
-                20% {{ text-shadow: -2px 0 red, 2px 0 cyan; }}
-                40% {{ text-shadow: 2px 2px red, -2px -2px cyan; }}
-                60% {{ text-shadow: -2px -2px red, 2px 2px cyan; }}
-                80% {{ text-shadow: 2px -2px red, -2px 2px cyan; }}
-                100% {{ text-shadow: 0 0 red, 0 0 cyan; }}
-            }}
             body {{
                 background-color: #0d0d0d;
                 color: #00ff99;
-                font-family: 'Courier New', monospace;
+                font-family: monospace;
                 text-align: center;
                 padding-top: 50px;
             }}
             h1 {{
                 color: #ff0000;
                 font-size: 2.5em;
-                animation: glitch 1s infinite;
                 margin-bottom: 20px;
             }}
-            .countdown {{ font-size: 1.5em; color:#00ffff; margin-bottom:30px; }}
             input, button {{
                 padding: 12px 20px;
                 margin: 15px;
@@ -71,46 +63,25 @@ def create_html():
                 background-color: #1a1a1a;
                 color:#00ff99;
                 outline:none;
-                box-shadow:0 0 10px #00ff99;
             }}
-            input:hover, button:hover {{ box-shadow:0 0 15px #00ff99,0 0 20px #00ff99; }}
             button {{
-                cursor:pointer;
-                font-weight:bold;
                 border:2px solid #ff0000;
                 color:#ff0000;
-                text-shadow:0 0 3px #ff0000;
             }}
-            button:hover {{ box-shadow:0 0 15px #ff0000,0 0 25px #ff0000; }}
         </style>
     </head>
     <body>
         <h1>HCO Photo Hide by Azhar</h1>
-        <div class="countdown" id="countdown">Countdown: 10</div>
         <input type="file" id="photo" /><br/>
         <input type="password" placeholder="Enter Password" id="password" /><br/>
         <button onclick="generateCode()">Generate Code</button>
         <p id="msg" style="color:#00ffff;font-weight:bold;"></p>
         <script>
-            let count = 10;
-            let countdownEl = document.getElementById('countdown');
-            let interval = setInterval(() => {{
-                countdownEl.innerText = "Countdown: " + count;
-                count--;
-                if(count < 0) clearInterval(interval);
-            }}, 1000);
-
             function generateCode() {{
                 let fileInput = document.getElementById('photo');
                 let password = document.getElementById('password').value;
-                if(fileInput.files.length==0) {{
-                    alert("Select a photo first!");
-                    return;
-                }}
-                if(password=="") {{
-                    alert("Enter a password!");
-                    return;
-                }}
+                if(fileInput.files.length==0) {{ alert("Select a photo!"); return; }}
+                if(password=="") {{ alert("Enter a password!"); return; }}
                 let reader = new FileReader();
                 reader.onload = function() {{
                     let data = reader.result.split(',')[1];
@@ -148,28 +119,10 @@ class MyHandler(SimpleHTTPRequestHandler):
         else:
             super().do_GET()
 
-# --- Step 6: Start server ---
 def start_server():
     os.chdir(WORKDIR)
     server = HTTPServer(("127.0.0.1", PORT), MyHandler)
     server.serve_forever()
-
-# --- Step 7: Start Cloudflare Tunnel ---
-def start_tunnel():
-    proc = subprocess.Popen(
-        ['cloudflared', 'tunnel', '--url', f'http://127.0.0.1:{PORT}'],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE
-    )
-    # Wait for tunnel URL in stdout
-    while True:
-        line = proc.stdout.readline().decode()
-        if 'https://' in line:
-            url = line.strip().split(' ')[-1]
-            print(Fore.GREEN + f"\n[✔] Public URL: {url}")
-            subprocess.run(['am', 'start', '-a', 'android.intent.action.VIEW', '-d', url])
-            break
-    return proc
 
 # --- Main ---
 def main():
@@ -181,8 +134,12 @@ def main():
 
     # Start server in background
     threading.Thread(target=start_server, daemon=True).start()
-    # Start Cloudflare Tunnel and open public link
-    start_tunnel()
+
+    # Open public Cloudflare URL directly in browser
+    subprocess.run([
+        'am', 'start', '-a', 'android.intent.action.VIEW',
+        '-d', PUBLIC_URL
+    ])
     print(Fore.GREEN + "\nHCO Photo Hide is now live on the internet!")
 
 if __name__ == "__main__":
