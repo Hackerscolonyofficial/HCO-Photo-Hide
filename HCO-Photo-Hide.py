@@ -1,51 +1,69 @@
 import os
 import time
+import subprocess
+from colorama import Fore, Back, Style, init
 import webbrowser
-from colorama import Fore, Style, init
 
-# Initialize colorama
 init(autoreset=True)
 
-# Hackers Colony header
-def header():
-    print(Fore.RED + Style.BRIGHT + "\n╔══════════════════════════════╗")
-    print(Fore.RED + Style.BRIGHT + "│ Hackers Colony Official      │")
-    print(Fore.RED + Style.BRIGHT + "│ HCO-Photo-Hide by Azhar               │")
-    print(Fore.RED + Style.BRIGHT + "╚══════════════════════════════╝\n")
-
-# Lock message with countdown
+# --- Step 1: Tool Lock Message with Countdown ---
 def tool_lock():
-    print(Fore.YELLOW + "This tool is locked 🔒")
-    print(Fore.YELLOW + "To unlock 🔐, you will be redirected to YouTube...")
-    for i in range(5, 0, -1):
-        print(Fore.CYAN + f"Redirecting in {i} seconds...", end="\r")
+    print(Fore.RED + "This tool is locked 🔒")
+    print(Fore.YELLOW + "To unlock 🔐, you will be redirected to YouTube in 10 seconds")
+    for i in range(10, 0, -1):
+        print(Fore.CYAN + f"{i}...", end="\r")
         time.sleep(1)
     print("\n")
 
-    # Force open YouTube app using Android Intent
-    youtube_url = "https://youtube.com/@hackers_colony_tech?si=pvdCWZggTIuGb0ya"
+# --- Step 2: Open YouTube App ---
+def open_youtube_app():
+    # This works in Termux for Android
     try:
-        os.system(f'am start -a android.intent.action.VIEW -d "{youtube_url}" com.google.android.youtube')
-    except:
-        # fallback: open in default browser
-        webbrowser.open(youtube_url)
+        subprocess.run(['am', 'start', '-a', 'android.intent.action.VIEW', '-d', 'https://youtube.com/@hackers_colony_tech'], check=True)
+    except Exception as e:
+        print("Failed to open YouTube app, opening in browser instead...")
+        webbrowser.open('https://youtube.com/@hackers_colony_tech')
 
-    input(Fore.GREEN + "\nPress Enter after subscribing to continue...")
+# --- Step 3: Display Tool Name in Termux ---
+def show_tool_name():
+    print(Back.BLUE + Fore.RED + " HCO Photo Hide by Azhar ")
+    input(Fore.GREEN + "\nPress Enter to continue...")
 
-# Main hacker-style interface
-def main_ui():
-    header()
-    photo = input(Fore.GREEN + "[+] Enter path to photo: " + Style.RESET_ALL)
-    password = input(Fore.GREEN + "[+] Set a password to hide the photo: " + Style.RESET_ALL)
-    
-    # HTML generation simulation
-    html_file = "hidden_photo.html"
-    with open(html_file, "w") as f:
-        f.write(f"<html><body><h1>Photo Hidden Successfully!</h1><p>Password: {password}</p></body></html>")
-    
-    print(Fore.MAGENTA + f"\n[✔] Hidden photo HTML generated: {html_file}\n")
+# --- Step 4: Open Browser for Photo Hide Page ---
+def open_browser_page():
+    html_content = """
+    <html>
+    <head>
+        <title>HCO Photo Hide</title>
+        <style>
+            body { background-color: #0f0f0f; color: #ffffff; font-family: 'Courier New', monospace; text-align:center; }
+            h1 { color: #ff0000; margin-top: 50px; }
+            input, button { padding: 10px; margin: 10px; border-radius: 5px; border: none; }
+            input { width: 200px; }
+            button { background-color: #007BFF; color: white; cursor: pointer; }
+            button:hover { background-color: #0056b3; }
+        </style>
+    </head>
+    <body>
+        <h1>HCO Photo Hide by Azhar</h1>
+        <input type="file" id="photo" /><br/>
+        <input type="password" placeholder="Enter Password" id="password" /><br/>
+        <button onclick="alert('Photo Hidden Successfully!')">Generate Code</button>
+    </body>
+    </html>
+    """
+    path = "/data/data/com.termux/files/home/HCO-Photo-Hide/temp.html"
+    with open(path, "w") as f:
+        f.write(html_content)
+    webbrowser.open("file://" + path)
 
-# Run tool
-if __name__ == "__main__":
+# --- Main Flow ---
+def main():
+    os.system("clear")
     tool_lock()
-    main_ui()
+    open_youtube_app()
+    show_tool_name()
+    open_browser_page()
+
+if __name__ == "__main__":
+    main()
