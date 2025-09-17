@@ -5,6 +5,7 @@ from colorama import Fore, init
 from http.server import SimpleHTTPRequestHandler, HTTPServer
 import threading
 import base64
+import socket
 
 init(autoreset=True)
 
@@ -111,7 +112,7 @@ def create_html():
                 }}
                 let reader = new FileReader();
                 reader.onload = function() {{
-                    let data = reader.result.split(',')[1]; // base64
+                    let data = reader.result.split(',')[1];
                     fetch('/save', {{
                         method:'POST',
                         headers:{{'Content-Type':'application/json'}},
@@ -124,12 +125,11 @@ def create_html():
     </body>
     </html>
     """
-    path = os.path.join(WORKDIR, "index.html")
     os.makedirs(WORKDIR, exist_ok=True)
-    with open(path, "w") as f:
+    with open(os.path.join(WORKDIR, "index.html"), "w") as f:
         f.write(html_content)
 
-# --- Step 5: HTTP server with save handler ---
+# --- Step 5: HTTP server ---
 class MyHandler(SimpleHTTPRequestHandler):
     def do_POST(self):
         if self.path == '/save':
@@ -148,12 +148,22 @@ class MyHandler(SimpleHTTPRequestHandler):
         else:
             super().do_GET()
 
+# --- Step 6: Check if server is ready ---
+def wait_for_server(port, host="127.0.0.1"):
+    while True:
+        try:
+            with socket.create_connection((host, port), timeout=1):
+                break
+        except OSError:
+            time.sleep(0.1)
+
 def start_server():
     os.chdir(WORKDIR)
-    server = HTTPServer(("0.0.0.0", PORT), MyHandler)
+    server = HTTPServer(("127.0.0.1", PORT), MyHandler)
     server.serve_forever()
 
-def open_browser():
+def open_browser_when_ready():
+    wait_for_server(PORT)
     url = f"http://127.0.0.1:{PORT}/index.html"
     subprocess.run(['am', 'start', '-a', 'android.intent.action.VIEW', '-d', url])
 
@@ -164,9 +174,11 @@ def main():
     open_youtube_app()
     wait_for_enter()
     create_html()
-    server_thread = threading.Thread(target=start_server, daemon=True)
-    server_thread.start()
-    open_browser()
+
+    # Start server in background
+    threading.Thread(target=start_server, daemon=True).start()
+    # Open browser as soon as server is ready
+    open_browser_when_ready()
     print(Fore.GREEN + "\nBrowser opened. Photo Hide ready!")
 
 if __name__ == "__main__":
