@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import os, sys, time, webbrowser
-from colorama import init, Fore, Style
+from colorama import init, Fore, Style, Back
 
 # Initialize Colorama
 init(autoreset=True)
@@ -57,6 +57,8 @@ def main_tool():
         img_data = f.read()
     img_b64 = base64.b64encode(img_data).decode('utf-8')
 
+    pw_b64 = base64.b64encode(password.encode()).decode()
+
     # Generate HTML content
     html_content = f"""<!doctype html>
 <html lang="en">
@@ -78,16 +80,17 @@ h1{{color:red;}}
 <img id="theimg" src="data:image/png;base64,{img_b64}">
 <div id="water">HCO Photo Hide by Azhar</div>
 <script>
-const STORED="{base64.b64encode(password.encode()).decode()}";
-function safeB64(s){return btoa(s);}
-setTimeout(()=>{
+const STORED="{pw_b64}";
+function safeB64(s){{return btoa(s);}}
+setTimeout(()=>{{
     let p = prompt('Enter password to reveal photo:');
-    if(btoa(p)!==STORED){alert('Wrong password'); return;}
+    if(btoa(p)!==STORED){{alert('Wrong password'); return;}}
     let n=8; const cnt=document.getElementById('count'); const img=document.getElementById('theimg');
-    const interval=setInterval(()=>{
+    const interval=setInterval(()=>{{
         cnt.textContent=n; n--;
-        if(n<0){clearInterval(interval);cnt.style.display='none';img.style.display='block';}},800);
-},200);
+        if(n<0){{clearInterval(interval);cnt.style.display='none';img.style.display='block';}}
+    }},800);
+}},200);
 </script>
 </body>
 </html>"""
