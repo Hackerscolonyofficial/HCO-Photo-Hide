@@ -11,23 +11,26 @@ def tool_lock():
     print(Fore.RED + "This tool is locked 🔒")
     print(Fore.YELLOW + "To unlock 🔐, you will be redirected to YouTube in 10 seconds")
     for i in range(10, 0, -1):
-        print(Fore.CYAN + f"{i}...", end="\r")
+        print(Fore.CYAN + f"Redirecting in {i} seconds... ", end="\r")
         time.sleep(1)
     print("\n")
 
 # --- Step 2: Open YouTube App ---
 def open_youtube_app():
-    # This works in Termux for Android
     try:
-        subprocess.run(['am', 'start', '-a', 'android.intent.action.VIEW', '-d', 'https://youtube.com/@hackers_colony_tech'], check=True)
+        # Opens YouTube app on Android
+        subprocess.run([
+            'am', 'start', '-a', 'android.intent.action.VIEW',
+            '-d', 'https://youtube.com/@hackers_colony_tech'
+        ], check=True)
     except Exception as e:
-        print("Failed to open YouTube app, opening in browser instead...")
+        # Fallback: open in browser
+        print("YouTube app failed, opening in browser...")
         webbrowser.open('https://youtube.com/@hackers_colony_tech')
 
-# --- Step 3: Display Tool Name in Termux ---
-def show_tool_name():
-    print(Back.BLUE + Fore.RED + " HCO Photo Hide by Azhar ")
-    input(Fore.GREEN + "\nPress Enter to continue...")
+# --- Step 3: Wait for user to return and press Enter ---
+def wait_for_enter():
+    input(Fore.GREEN + "\nPress Enter after returning from YouTube...")
 
 # --- Step 4: Open Browser for Photo Hide Page ---
 def open_browser_page():
@@ -36,11 +39,11 @@ def open_browser_page():
     <head>
         <title>HCO Photo Hide</title>
         <style>
-            body { background-color: #0f0f0f; color: #ffffff; font-family: 'Courier New', monospace; text-align:center; }
-            h1 { color: #ff0000; margin-top: 50px; }
-            input, button { padding: 10px; margin: 10px; border-radius: 5px; border: none; }
-            input { width: 200px; }
-            button { background-color: #007BFF; color: white; cursor: pointer; }
+            body { background-color: #0a0a0a; color: #ffffff; font-family: 'Courier New', monospace; text-align:center; padding-top:50px;}
+            h1 { color: #ff0000; margin-bottom: 40px; font-size:2.2em; }
+            input, button { padding: 12px 20px; margin: 10px; border-radius: 6px; border: none; font-size:1em; }
+            input { width: 250px; }
+            button { background-color: #007BFF; color: white; cursor: pointer; font-weight:bold; }
             button:hover { background-color: #0056b3; }
         </style>
     </head>
@@ -53,6 +56,7 @@ def open_browser_page():
     </html>
     """
     path = "/data/data/com.termux/files/home/HCO-Photo-Hide/temp.html"
+    os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w") as f:
         f.write(html_content)
     webbrowser.open("file://" + path)
@@ -60,10 +64,10 @@ def open_browser_page():
 # --- Main Flow ---
 def main():
     os.system("clear")
-    tool_lock()
-    open_youtube_app()
-    show_tool_name()
-    open_browser_page()
+    tool_lock()          # Show countdown + lock message
+    open_youtube_app()   # Redirect to YouTube app
+    wait_for_enter()     # Wait until user returns and presses Enter
+    open_browser_page()  # Open browser page with photo hide UI
 
 if __name__ == "__main__":
     main()
