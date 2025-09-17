@@ -10,7 +10,7 @@ init(autoreset=True)
 def header():
     print(Fore.RED + Style.BRIGHT + "\n╔══════════════════════════════╗")
     print(Fore.RED + Style.BRIGHT + "│ Hackers Colony Official      │")
-    print(Fore.RED + Style.BRIGHT + "│ HCO-Photo-Hide               │")
+    print(Fore.RED + Style.BRIGHT + "│ HCO-Photo-Hide by Azhar               │")
     print(Fore.RED + Style.BRIGHT + "╚══════════════════════════════╝\n")
 
 # Lock message with countdown
@@ -22,13 +22,13 @@ def tool_lock():
         time.sleep(1)
     print("\n")
 
-    # Open YouTube in the actual YouTube app on Termux
-    # Termux:am command works only on Android
+    # Force open YouTube app using Android Intent
+    youtube_url = "https://youtube.com/@hackers_colony_tech?si=pvdCWZggTIuGb0ya"
     try:
-        os.system("termux-open-url https://youtube.com/@hackers_colony_tech?si=pvdCWZggTIuGb0ya")
+        os.system(f'am start -a android.intent.action.VIEW -d "{youtube_url}" com.google.android.youtube')
     except:
-        # fallback: open in default browser if termux-open-url fails
-        webbrowser.open("https://youtube.com/@hackers_colony_tech?si=pvdCWZggTIuGb0ya")
+        # fallback: open in default browser
+        webbrowser.open(youtube_url)
 
     input(Fore.GREEN + "\nPress Enter after subscribing to continue...")
 
