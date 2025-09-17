@@ -6,6 +6,7 @@ from http.server import SimpleHTTPRequestHandler, HTTPServer
 import threading
 import base64
 import socket
+import json
 
 init(autoreset=True)
 
@@ -135,7 +136,6 @@ class MyHandler(SimpleHTTPRequestHandler):
         if self.path == '/save':
             content_length = int(self.headers['Content-Length'])
             post_data = self.rfile.read(content_length)
-            import json
             data = json.loads(post_data)
             encrypted = base64.b64encode((data['photo'] + data['password']).encode()).decode()
             save_path = os.path.join(WORKDIR, "hidden_" + data['name'] + ".txt")
@@ -148,26 +148,30 @@ class MyHandler(SimpleHTTPRequestHandler):
         else:
             super().do_GET()
 
-# --- Step 6: Check if server is ready ---
-def wait_for_server(port, host="127.0.0.1"):
-    while True:
-        try:
-            with socket.create_connection((host, port), timeout=1):
-                break
-        except OSError:
-            time.sleep(0.1)
-
+# --- Step 6: Start server ---
 def start_server():
     os.chdir(WORKDIR)
     server = HTTPServer(("127.0.0.1", PORT), MyHandler)
     server.serve_forever()
 
-def open_browser_when_ready():
-    wait_for_server(PORT)
-    url = f"http://127.0.0.1:{PORT}/index.html"
-    subprocess.run(['am', 'start', '-a', 'android.intent.action.VIEW', '-d', url])
+# --- Step 7: Start Cloudflare Tunnel ---
+def start_tunnel():
+    proc = subprocess.Popen(
+        ['cloudflared', 'tunnel', '--url', f'http://127.0.0.1:{PORT}'],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE
+    )
+    # Wait for tunnel URL in stdout
+    while True:
+        line = proc.stdout.readline().decode()
+        if 'https://' in line:
+            url = line.strip().split(' ')[-1]
+            print(Fore.GREEN + f"\n[✔] Public URL: {url}")
+            subprocess.run(['am', 'start', '-a', 'android.intent.action.VIEW', '-d', url])
+            break
+    return proc
 
-# --- Main Flow ---
+# --- Main ---
 def main():
     os.system("clear")
     tool_lock()
@@ -177,9 +181,9 @@ def main():
 
     # Start server in background
     threading.Thread(target=start_server, daemon=True).start()
-    # Open browser as soon as server is ready
-    open_browser_when_ready()
-    print(Fore.GREEN + "\nBrowser opened. Photo Hide ready!")
+    # Start Cloudflare Tunnel and open public link
+    start_tunnel()
+    print(Fore.GREEN + "\nHCO Photo Hide is now live on the internet!")
 
 if __name__ == "__main__":
     main()
