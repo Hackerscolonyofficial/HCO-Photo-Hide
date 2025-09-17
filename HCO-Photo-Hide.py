@@ -6,14 +6,12 @@ from http.server import SimpleHTTPRequestHandler, HTTPServer
 import threading
 import base64
 import json
+import re
 
 init(autoreset=True)
 
 PORT = 8000
 WORKDIR = "/data/data/com.termux/files/home/HCO-Photo-Hide"
-
-# Replace with your Cloudflare public URL
-PUBLIC_URL = "https://abcd1234.cloudflaretunnel.com"
 
 # --- Step 1: Tool Lock Message ---
 def tool_lock():
@@ -42,32 +40,10 @@ def create_html():
     <head>
         <title>HCO Photo Hide</title>
         <style>
-            body {{
-                background-color: #0d0d0d;
-                color: #00ff99;
-                font-family: monospace;
-                text-align: center;
-                padding-top: 50px;
-            }}
-            h1 {{
-                color: #ff0000;
-                font-size: 2.5em;
-                margin-bottom: 20px;
-            }}
-            input, button {{
-                padding: 12px 20px;
-                margin: 15px;
-                border-radius: 8px;
-                border: 2px solid #00ff99;
-                font-size: 1em;
-                background-color: #1a1a1a;
-                color:#00ff99;
-                outline:none;
-            }}
-            button {{
-                border:2px solid #ff0000;
-                color:#ff0000;
-            }}
+            body {{ background-color: #0d0d0d; color: #00ff99; font-family: monospace; text-align: center; padding-top: 50px; }}
+            h1 {{ color: #ff0000; font-size: 2.5em; margin-bottom: 20px; }}
+            input, button {{ padding: 12px 20px; margin: 15px; border-radius: 8px; border: 2px solid #00ff99; font-size: 1em; background-color: #1a1a1a; color:#00ff99; outline:none; }}
+            button {{ border:2px solid #ff0000; color:#ff0000; }}
         </style>
     </head>
     <body>
@@ -124,6 +100,30 @@ def start_server():
     server = HTTPServer(("127.0.0.1", PORT), MyHandler)
     server.serve_forever()
 
+# --- Step 6: Start Cloudflare Tunnel automatically ---
+def start_tunnel_and_get_url():
+    proc = subprocess.Popen(
+        ['cloudflared', 'tunnel', '--url', f'http://127.0.0.1:{PORT}'],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True
+    )
+    public_url = None
+    while True:
+        line = proc.stdout.readline()
+        if line:
+            match = re.search(r'https://[^\s]+', line)
+            if match:
+                public_url = match.group(0)
+                break
+    print(Fore.GREEN + f"\n[✔] Public URL: {public_url}")
+    # Open in browser
+    subprocess.run([
+        'am', 'start', '-a', 'android.intent.action.VIEW',
+        '-d', public_url
+    ])
+    return proc
+
 # --- Main ---
 def main():
     os.system("clear")
@@ -135,11 +135,8 @@ def main():
     # Start server in background
     threading.Thread(target=start_server, daemon=True).start()
 
-    # Open public Cloudflare URL directly in browser
-    subprocess.run([
-        'am', 'start', '-a', 'android.intent.action.VIEW',
-        '-d', PUBLIC_URL
-    ])
+    # Start Cloudflare Tunnel and open browser automatically
+    start_tunnel_and_get_url()
     print(Fore.GREEN + "\nHCO Photo Hide is now live on the internet!")
 
 if __name__ == "__main__":
